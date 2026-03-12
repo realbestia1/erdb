@@ -89,7 +89,7 @@ const parseNonNegativeInt = (value?: string | null, max = Number.MAX_SAFE_INTEGE
   if (!Number.isFinite(parsed) || parsed < 0) return null;
   return Math.min(max, Math.floor(parsed));
 };
-const FINAL_IMAGE_RENDERER_CACHE_VERSION = 'poster-backdrop-logo-v15';
+const FINAL_IMAGE_RENDERER_CACHE_VERSION = 'poster-backdrop-logo-v16';
 const TMDB_CACHE_TTL_MS = parseCacheTtlMs(
   process.env.ERDB_TMDB_CACHE_TTL_MS,
   3 * 24 * 60 * 60 * 1000,
@@ -1475,6 +1475,7 @@ type FastRenderInput = {
   finalOutputHeight: number;
   logoBadgeBandHeight: number;
   posterBadgeBandHeight: number;
+  posterBelowBadgesPerRow: number;
   logoBadgeMaxWidth: number;
   logoBadgesPerRow: number;
   posterRowHorizontalInset: number;
@@ -2471,9 +2472,14 @@ const renderWithSharp = async (
           }
         }
       } else if (input.imageType === 'poster') {
-        if (input.posterRatingsLayout === 'below' && input.posterBadgeBandHeight > 0) {
-          const belowY = input.outputHeight + Math.max(0, Math.floor((input.posterBadgeBandHeight - badgeHeight) / 2));
-          composeBadgeRow(input.bottomBadges, belowY);
+        if (input.posterRatingsLayout === 'below' && input.posterBadgeBandHeight > 0 && input.posterBelowBadgesPerRow > 0) {
+          const rows = chunkBy(input.bottomBadges, input.posterBelowBadgesPerRow);
+          const rowsTotalHeight = rows.length * badgeHeight + Math.max(0, rows.length - 1) * input.badgeGap;
+          let belowY = input.outputHeight + Math.max(0, Math.floor((input.posterBadgeBandHeight - rowsTotalHeight) / 2));
+          for (const row of rows) {
+            composeBadgeRow(row, belowY);
+            belowY += badgeHeight + input.badgeGap;
+          }
         } else if (input.posterRatingsLayout === 'left' || input.posterRatingsLayout === 'right') {
           const maxBadgeWidth = Math.max(180, Math.floor(input.outputWidth * 0.46));
           composeBadgeColumn(
@@ -3515,8 +3521,26 @@ export async function GET(
         ? Math.max(170, logoBadgeRows * logoBadgeItemHeight + Math.max(0, logoBadgeRows - 1) * badgeGap + 68)
         : 0;
       const usePosterBelowLayout = imageType === 'poster' && isBelowPosterRatingLayout(posterRatingsLayout) && cappedRatingBadges.length > 0;
+      const posterBelowBadgeRowWidth = usePosterBelowLayout
+        ? measureBadgeRowWidth(cappedRatingBadges, {
+            iconSize: badgeIconSize,
+            fontSize: badgeFontSize,
+            paddingX: badgePaddingX,
+            paddingY: badgePaddingY,
+            gap: badgeGap,
+          })
+        : 0;
+      const posterBelowMaxRowWidth = Math.max(0, outputWidth - 24);
+      const posterBelowBadgesPerRow = usePosterBelowLayout
+        ? (posterBelowBadgeRowWidth <= posterBelowMaxRowWidth
+            ? cappedRatingBadges.length
+            : Math.max(1, Math.floor(cappedRatingBadges.length * posterBelowMaxRowWidth / Math.max(1, posterBelowBadgeRowWidth))))
+        : 0;
+      const posterBelowRows = usePosterBelowLayout
+        ? Math.ceil(cappedRatingBadges.length / Math.max(1, posterBelowBadgesPerRow))
+        : 0;
       const posterBadgeBandHeight = usePosterBelowLayout
-        ? logoBadgeItemHeight + 24
+        ? posterBelowRows * logoBadgeItemHeight + Math.max(0, posterBelowRows - 1) * badgeGap + 28
         : 0;
       const finalOutputHeight = useLogoBadgeLayout
         ? logoImageHeight + logoBadgeBandHeight
@@ -3547,6 +3571,7 @@ export async function GET(
           finalOutputHeight,
           logoBadgeBandHeight,
           posterBadgeBandHeight,
+          posterBelowBadgesPerRow,
           logoBadgeMaxWidth,
           logoBadgesPerRow,
           posterRowHorizontalInset,
