@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-const ERDB_OPTIONAL_PARAMS = [
+const ERDB_OPTIONAL_PARAMS: Array<keyof ProxyConfig> = [
   'ratings',
   'lang',
   'posterRatingsLayout',
