@@ -6,7 +6,7 @@ const ERDB_OPTIONAL_PARAMS = [
   'posterRatingsLayout',
   'posterRatingsMaxPerSide',
   'backdropRatingsLayout',
-];
+] as const;
 
 const ERDB_TYPE_STYLE_PARAMS = {
   poster: {
