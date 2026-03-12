@@ -9,6 +9,6 @@ export const buildContentSecurityPolicy = (input: { nonce: string; isDev?: boole
     "connect-src 'self' https: ws: wss:",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'none'",
+    "frame-ancestors *",
     "object-src 'none'",
   ].join('; ');
