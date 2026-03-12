@@ -1,19 +1,19 @@
 ---
 title: ERDB - Easy Ratings Database
 emoji: 🎬
-colorFrom: blue
-colorTo: purple
+colorFrom: purple
+colorTo: blue
 sdk: docker
 app_port: 7860
 pinned: false
 ---
 
-# ERDB - Easy Ratings Database
+# ERDB - Easy Ratings Database (Stateless Edition)
 
-Generates poster/backdrop/logo with dynamic ratings on-the-fly.
+Genera poster/backdrop/logo con ratings dinamici on-the-fly.
 
-## Usage
+## API Usage
 
-`GET /{type}/{id}.jpg?ratings={providers}&lang={lang}&tmdbKey={key}&mdblistKey={key}`
+Endpoint: GET /{type}/{id}.jpg?ratings={providers}&lang={lang}&tmdbKey={key}&mdblistKey={key}
 
-Example: `/poster/tt0133093.jpg?ratings=imdb,tmdb&lang=it&tmdbKey=YOUR_KEY&mdblistKey=YOUR_KEY`
+Esempio: /poster/tt0133093.jpg?ratings=imdb,tmdb&lang=it&tmdbKey=YOUR_KEY&mdblistKey=YOUR_KEY
