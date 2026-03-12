@@ -17,6 +17,7 @@ import {
   DEFAULT_POSTER_RATING_LAYOUT,
   getPosterRatingLayoutMaxBadges,
   getPosterRatingLayoutLimit,
+  isBelowPosterRatingLayout,
   normalizePosterRatingLayout,
   normalizePosterRatingsMaxPerSide,
   type PosterRatingLayout,
@@ -88,7 +89,7 @@ const parseNonNegativeInt = (value?: string | null, max = Number.MAX_SAFE_INTEGE
   if (!Number.isFinite(parsed) || parsed < 0) return null;
   return Math.min(max, Math.floor(parsed));
 };
-const FINAL_IMAGE_RENDERER_CACHE_VERSION = 'poster-backdrop-logo-v14';
+const FINAL_IMAGE_RENDERER_CACHE_VERSION = 'poster-backdrop-logo-v15';
 const TMDB_CACHE_TTL_MS = parseCacheTtlMs(
   process.env.ERDB_TMDB_CACHE_TTL_MS,
   3 * 24 * 60 * 60 * 1000,
@@ -1473,6 +1474,7 @@ type FastRenderInput = {
   imageHeight?: number;
   finalOutputHeight: number;
   logoBadgeBandHeight: number;
+  posterBadgeBandHeight: number;
   logoBadgeMaxWidth: number;
   logoBadgesPerRow: number;
   posterRowHorizontalInset: number;
@@ -2069,7 +2071,7 @@ const splitPosterBadgesByLayout = (
   if (layout === 'top') {
     return { topBadges: limitedBadges, bottomBadges: [], leftBadges: [], rightBadges: [] };
   }
-  if (layout === 'bottom') {
+  if (layout === 'bottom' || layout === 'below') {
     return { topBadges: [], bottomBadges: limitedBadges, leftBadges: [], rightBadges: [] };
   }
   if (layout === 'left') {
@@ -2265,7 +2267,8 @@ const renderWithSharp = async (
       input.imageType === 'poster' &&
       input.posterRatingsLayout !== 'left' &&
       input.posterRatingsLayout !== 'right' &&
-      input.posterRatingsLayout !== 'left-right';
+      input.posterRatingsLayout !== 'left-right' &&
+      input.posterRatingsLayout !== 'below';
     const posterRowRegionWidth = Math.max(0, input.outputWidth - input.posterRowHorizontalInset * 2);
     const composeBadgeRow = (
       rowBadges: RatingBadge[],
@@ -2468,7 +2471,10 @@ const renderWithSharp = async (
           }
         }
       } else if (input.imageType === 'poster') {
-        if (input.posterRatingsLayout === 'left' || input.posterRatingsLayout === 'right') {
+        if (input.posterRatingsLayout === 'below' && input.posterBadgeBandHeight > 0) {
+          const belowY = input.outputHeight + Math.max(0, Math.floor((input.posterBadgeBandHeight - badgeHeight) / 2));
+          composeBadgeRow(input.bottomBadges, belowY);
+        } else if (input.posterRatingsLayout === 'left' || input.posterRatingsLayout === 'right') {
           const maxBadgeWidth = Math.max(180, Math.floor(input.outputWidth * 0.46));
           composeBadgeColumn(
             input.posterRatingsLayout === 'left' ? input.leftBadges : input.rightBadges,
@@ -3508,7 +3514,15 @@ export async function GET(
       const logoBadgeBandHeight = useLogoBadgeLayout && cappedRatingBadges.length > 0
         ? Math.max(170, logoBadgeRows * logoBadgeItemHeight + Math.max(0, logoBadgeRows - 1) * badgeGap + 68)
         : 0;
-      const finalOutputHeight = useLogoBadgeLayout ? logoImageHeight + logoBadgeBandHeight : outputHeight;
+      const usePosterBelowLayout = imageType === 'poster' && isBelowPosterRatingLayout(posterRatingsLayout) && cappedRatingBadges.length > 0;
+      const posterBadgeBandHeight = usePosterBelowLayout
+        ? logoBadgeItemHeight + 24
+        : 0;
+      const finalOutputHeight = useLogoBadgeLayout
+        ? logoImageHeight + logoBadgeBandHeight
+        : usePosterBelowLayout
+          ? outputHeight + posterBadgeBandHeight
+          : outputHeight;
       const renderedRatingCacheTtlCandidates = ratingBadges
         .map((badge) => {
           if (badge.key === 'tmdb') {
@@ -3532,6 +3546,7 @@ export async function GET(
           imageHeight: useLogoBadgeLayout ? logoImageHeight : undefined,
           finalOutputHeight,
           logoBadgeBandHeight,
+          posterBadgeBandHeight,
           logoBadgeMaxWidth,
           logoBadgesPerRow,
           posterRowHorizontalInset,

@@ -5,6 +5,7 @@ export const POSTER_RATING_LAYOUT_OPTIONS = [
   { id: 'right', label: 'Right Vertical' },
   { id: 'top-bottom', label: 'Top & Bottom' },
   { id: 'left-right', label: 'Left & Right Vertical' },
+  { id: 'below', label: 'Below Poster' },
 ] as const;
 
 export type PosterRatingLayout = (typeof POSTER_RATING_LAYOUT_OPTIONS)[number]['id'];
@@ -17,8 +18,9 @@ export const DEFAULT_POSTER_RATINGS_MAX_PER_SIDE: number | null = null;
 const POSTER_RATING_LAYOUT_SET = new Set<PosterRatingLayout>(
   POSTER_RATING_LAYOUT_OPTIONS.map((option) => option.id)
 );
-const SINGLE_POSTER_RATING_LAYOUTS = new Set<PosterRatingLayout>(['top', 'bottom', 'left', 'right']);
+const SINGLE_POSTER_RATING_LAYOUTS = new Set<PosterRatingLayout>(['top', 'bottom', 'left', 'right', 'below']);
 const VERTICAL_POSTER_RATING_LAYOUTS = new Set<PosterRatingLayout>(['left', 'right', 'left-right']);
+const BELOW_POSTER_RATING_LAYOUT = new Set<PosterRatingLayout>(['below']);
 
 export const normalizePosterRatingLayout = (value?: string | null): PosterRatingLayout => {
   const normalized = (value || '').trim().toLowerCase();
@@ -47,9 +49,13 @@ export const isSinglePosterRatingLayout = (layout: PosterRatingLayout) =>
 export const isVerticalPosterRatingLayout = (layout: PosterRatingLayout) =>
   VERTICAL_POSTER_RATING_LAYOUTS.has(layout);
 
+export const isBelowPosterRatingLayout = (layout: PosterRatingLayout) =>
+  BELOW_POSTER_RATING_LAYOUT.has(layout);
+
 export const getPosterRatingLayoutLimit = (layout: PosterRatingLayout): number | null => {
   if (layout === 'top' || layout === 'bottom') return 3;
   if (layout === 'top-bottom') return 6;
+  if (layout === 'below') return null;
   return null;
 };
 
@@ -74,7 +80,7 @@ export const describePosterRatingLayoutLimit = (
   if (limit !== null) return `up to ${limit}`;
 
   const normalizedMaxPerSide = normalizePosterRatingsMaxPerSide(maxPerSide);
-  if (normalizedMaxPerSide === null) return 'all that fit inside the poster';
+  if (normalizedMaxPerSide === null) return layout === 'below' ? 'all that fit below the poster' : 'all that fit inside the poster';
   if (layout === 'left-right') return `up to ${normalizedMaxPerSide} per side`;
   return `up to ${normalizedMaxPerSide} on the selected side`;
 };

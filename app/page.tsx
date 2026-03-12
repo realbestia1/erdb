@@ -139,7 +139,7 @@ Endpoint: GET /{type}/{id}.jpg?...queryParams
 | lang                    | Any TMDB ISO 639-1 code (en, it, fr, es, de, ja, ko, zh, pt, ru, ar, hi, etc.)                                                                     | en            |
 | ratingStyle             | glass, square, plain                                                                                                                                 | glass         |
 | imageText               | original, clean, alternative                                                                                                                         | original      |
-| posterRatingsLayout     | top, bottom, left, right, top-bottom, left-right                                                                                                     | top-bottom    |
+| posterRatingsLayout     | top, bottom, left, right, top-bottom, left-right, below                                                                                              | top-bottom    |
 | posterRatingsMaxPerSide | Number (1-20)                                                                                                                                        | auto          |
 | backdropRatingsLayout   | center, right, right-vertical                                                                                                                        | center        |
 | tmdbKey (REQUIRED)      | Your TMDB v3 API Key                                                                                                                                 | —             |
@@ -149,7 +149,7 @@ Endpoint: GET /{type}/{id}.jpg?...queryParams
 poster:
 - imageText: original, clean, alternative
 - ratingStyle: glass, square, plain (per-type override)
-- posterRatingsLayout: top, bottom, left, right, top-bottom, left-right
+- posterRatingsLayout: top, bottom, left, right, top-bottom, left-right, below
 - posterRatingsMaxPerSide: 1-20 (auto if omitted)
 backdrop:
 - imageText: original, clean, alternative
@@ -1092,7 +1092,7 @@ mdblistKey (REQUIRED)   | Your MDBList.com API Key                              
 poster:
 - imageText: original, clean, alternative
 - ratingStyle: glass, square, plain (per-type override)
-- posterRatingsLayout: top, bottom, left, right, top-bottom, left-right
+- posterRatingsLayout: top, bottom, left, right, top-bottom, left-right, below
 - posterRatingsMaxPerSide: 1-20 (auto if omitted)
 backdrop:
 - imageText: original, clean, alternative
