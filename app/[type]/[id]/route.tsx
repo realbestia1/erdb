@@ -2624,6 +2624,12 @@ export async function GET(
   const shouldCacheFinalImage = shouldApplyRatings;
   const effectiveRatingPreferences = shouldApplyRatings ? ratingPreferences : [];
   const selectedRatings = new Set<RatingPreference>(ratingPreferences);
+  const apiKeyFingerprint = [
+    mdblistKey ? 'mdb' : '',
+    omdbKey ? 'omdb' : '',
+    tvdbKey ? 'tvdb' : '',
+    MDBLIST_API_KEYS.length > 0 ? 'mdb-env' : '',
+  ].filter(Boolean).join('+') || 'nokeys';
   const finalImageCacheKey = [
     FINAL_IMAGE_RENDERER_CACHE_VERSION,
     imageType,
@@ -2635,7 +2641,7 @@ export async function GET(
     imageType === 'backdrop' ? backdropRatingsLayout : '-',
     ratingStyle,
     effectiveRatingPreferences.join(',') || 'none',
-    'v1', // Static version since we no longer have tokenConfigVersion
+    apiKeyFingerprint,
   ].join('|');
   const finalCacheHash = sha1Hex(finalImageCacheKey);
   const finalObjectStorageKey = buildObjectStorageImageKey(finalCacheHash);
