@@ -3295,7 +3295,7 @@ export async function GET(
   try {
     const renderedImage = await withDedupe(finalImageInFlight, renderSeedKey, async () => {
       let media = null;
-      let mediaType = null;
+      let mediaType: 'movie' | 'tv' | null = null;
       let useRawKitsuFallback = false;
       let rawFallbackImageUrl: string | null = null;
       let rawFallbackKitsuRating: string | null = null;
