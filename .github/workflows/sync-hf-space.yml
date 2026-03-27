@@ -1,0 +1,26 @@
+name: Sync repo on HF Space
+
+env:
+  HF_USERNAME: EDIT_THIS_WITH_YOUR_HF_USERNAME
+  HF_SPACE: EDIT_THIS_WITH_YOUR_HF_SPACE_NAME
+  
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: taiki-e/checkout-action@v1.4.1
+      - uses: huggingface/hub-sync@v0.1.0
+        with:
+          github_repo_id: ${{ github.repository }}
+          huggingface_repo_id: ${{ env.HF_USERNAME }}/${{ env.HF_SPACE }}
+          hf_token: ${{ secrets.HF_TOKEN }}
+          repo_type: space
+          space_sdk: docker
+          exclude: README.md
