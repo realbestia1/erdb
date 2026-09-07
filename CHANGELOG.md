@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.99](https://github.com/realbestia1/erdb/compare/v0.4.98...v0.4.99) - 2026-09-07
+
+- Always use WebP output; bump cache version ([39cb13f](https://github.com/realbestia1/erdb/commit/39cb13ff756bc7189c3ade7a771991d49f4dd0d0))
+  pickOutputFormat now returns WebP for non-logo images (dropping Accept header negotiation) to produce smaller images and standardize output. Logos still render as PNG. FINAL_IMAGE_RENDERER_CACHE_VERSION was bumped to 'poster-backdrop-logo-thumbnail-v244-webp' to invalidate caches after the format change.
+
 ## [0.4.98](https://github.com/realbestia1/erdb/compare/v0.4.97...v0.4.98) - 2026-08-22
 
 - Use native select for language picker ([2b3f75e](https://github.com/realbestia1/erdb/commit/2b3f75ea45fc919233ce566d0076d2b5522c98ff))
