@@ -701,8 +701,8 @@ export const shouldRenderRatingValue = (value: string | null | undefined) => {
 
 export const pickOutputFormat = (imageType: RenderImageType, acceptHeader?: string | null): OutputFormat => {
   if (imageType === 'logo') return 'png';
-  const accept = (acceptHeader || '').toLowerCase();
-  return accept.includes('image/webp') ? 'webp' : 'jpeg';
+  // WebP is smaller than JPEG and is supported by current clients.
+  return 'webp';
 };
 
 export const outputFormatToContentType = (format: OutputFormat) => {

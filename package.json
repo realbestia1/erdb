@@ -1,6 +1,6 @@
 {
   "name": "easy-ratings-db",
-  "version": "0.4.98",
+  "version": "0.4.99",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
