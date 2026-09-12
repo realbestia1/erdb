@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.50](https://github.com/realbestia1/erdb/compare/v0.4.99...v0.4.50) - 2026-09-12
+
+- Improve performance: caching, LRU, sharp tuning ([f122173](https://github.com/realbestia1/erdb/commit/f122173751eb9e0f32e404b890df1cc81c27b554))
+  Add multiple performance and stability improvements:
+
+  - Environment & compose: document ERDB_SOURCE_CACHE_MAX_FILES and ERDB_SHARP_CONCURRENCY; set docker defaults.
+  - Sharp & TMDB: default Sharp concurrency to 1 and pick smaller TMDB sizes to reduce decode/resize CPU.
+  - Source disk cache: compress source images to WebP, cache smaller <=1280px versions, and add enforceSourceCacheLimit eviction.
+  - Object storage: run full prune only on one worker (cluster check) and add source eviction routine.
+  - Metadata cache: per-worker in-memory LRU, reuse prepared statements, avoid frequent last_accessed writes, safer prune, add deleteMetadata.
+  - DB: set SQLite busy_timeout to 5000ms to reduce busy errors.
+  - Tokens: add 30s in-memory LRU for token configs and invalidate on update/delete.
+  - Responses: use payload.cacheControl, add Vary: Accept, and include cache-control on errors.
+  - Cache control: cap browser max-age to 1 day while keeping CDN s-maxage.
+
+  These changes reduce CPU, DB contention, and unbounded disk growth while improving throughput.
+
 ## [0.4.99](https://github.com/realbestia1/erdb/compare/v0.4.98...v0.4.99) - 2026-09-07
 
 - Always use WebP output; bump cache version ([39cb13f](https://github.com/realbestia1/erdb/commit/39cb13ff756bc7189c3ade7a771991d49f4dd0d0))
