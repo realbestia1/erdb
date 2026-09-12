@@ -5,6 +5,15 @@ import { accountsDb } from './accountsDb';
 const SALT_SIZE = 16;
 const KEY_LEN = 64;
 
+// ponytail: see getTokenConfig.
+const TOKEN_CONFIG_CACHE_TTL_MS = 30 * 1000;
+const TOKEN_CONFIG_CACHE_MAX = 200;
+const tokenConfigCache = new Map<string, { config: any; updatedAt: number; expiresAt: number }>();
+
+const invalidateTokenCache = (token: string) => {
+  tokenConfigCache.delete(token);
+};
+
 /**
  * Generates a long random token starting with 'Tk-'
  */
@@ -33,13 +42,28 @@ export function verifyPassword(password: string, hash: string): boolean {
 }
 
 export function getTokenConfig(token: string) {
+  // ponytail: few shared tokens x thousands of image hits. 30s LRU avoids a
+  // sync SQLite read + JSON.parse of a big config on every single image.
+  // Worst case: config edits apply within 30s.
+  const now = Date.now();
+  const cached = tokenConfigCache.get(token);
+  if (cached && cached.expiresAt > now) {
+    return { config: cached.config, updatedAt: cached.updatedAt };
+  }
+  tokenConfigCache.delete(token);
   const row = accountsDb.prepare('SELECT config_json, updated_at FROM tokens WHERE token = ?').get(token) as { config_json: string, updated_at: number } | undefined;
   if (!row) return null;
   try {
-    return {
+    const parsed = {
       config: JSON.parse(row.config_json),
       updatedAt: row.updated_at
     };
+    tokenConfigCache.set(token, { ...parsed, expiresAt: now + TOKEN_CONFIG_CACHE_TTL_MS });
+    if (tokenConfigCache.size > TOKEN_CONFIG_CACHE_MAX) {
+      const oldest = tokenConfigCache.keys().next().value;
+      if (oldest !== undefined) tokenConfigCache.delete(oldest);
+    }
+    return { config: parsed.config, updatedAt: parsed.updatedAt };
   } catch {
     return null;
   }
@@ -104,6 +128,7 @@ export function updateToken(token: string, password: string, config: any) {
     SET config_json = ?, updated_at = ?
     WHERE token = ?
   `).run(JSON.stringify(config), now, token);
+  invalidateTokenCache(token);
   
   return true;
 }
@@ -118,6 +143,7 @@ export function updateTokenConfigWithoutPassword(token: string, config: any) {
     SET config_json = ?, updated_at = ?
     WHERE token = ?
   `).run(JSON.stringify(config), now, token);
+  invalidateTokenCache(token);
 
   return true;
 }
@@ -131,5 +157,6 @@ export function deleteToken(token: string, password: string) {
   }
   
   accountsDb.prepare('DELETE FROM tokens WHERE token = ?').run(token);
+  invalidateTokenCache(token);
   return true;
 }

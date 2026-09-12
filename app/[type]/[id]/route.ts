@@ -1443,7 +1443,7 @@ export async function GET(
           return {
             body: cachedFinalImage.body,
             contentType: cachedFinalImage.contentType,
-            cacheControl: responseHeadersCacheControl,
+            cacheControl: cachedFinalImage.cacheControl,
           };
 
         }
@@ -2921,7 +2921,7 @@ export async function GET(
         return {
           body: payload.body,
           contentType: payload.contentType,
-          cacheControl: responseHeadersCacheControl,
+          cacheControl: payload.cacheControl,
         };
       }
       if (providerRatingsPromise) {
@@ -3069,7 +3069,7 @@ export async function GET(
         return {
           body: payload.body,
           contentType: payload.contentType,
-          cacheControl: responseHeadersCacheControl,
+          cacheControl: payload.cacheControl,
         };
       }
       const usePosterBadgeLayout = imageType === 'poster';
@@ -3720,7 +3720,7 @@ export async function GET(
           rankingPosition,
           posterConfiguratorPreset,
           posterVignetteEnabled,
-          cacheControl: responseHeadersCacheControl,
+          cacheControl: storageCacheControl,
         },
         phases
       );
@@ -3743,7 +3743,8 @@ export async function GET(
     const finalPayload = renderedImage as RenderedImagePayload;
     return respond(finalPayload.body, 200, {
       'Content-Type': finalPayload.contentType,
-      'Cache-Control': responseHeadersCacheControl,
+      'Cache-Control': finalPayload.cacheControl,
+      'Vary': 'Accept',
     });
   } catch (e: any) {
     if (e instanceof HttpError) {
@@ -3754,7 +3755,7 @@ export async function GET(
     }
     const message = typeof e?.message === 'string' ? e.message : 'Unknown error';
     const stack = process.env.NODE_ENV !== 'production' && typeof e?.stack === 'string' ? `\n${e.stack}` : '';
-    return respond(`Error: ${message}${stack}`, 500);
+    return respond(`Error: ${message}${stack}`, 500, { 'Cache-Control': responseHeadersCacheControl });
   }
 }
 

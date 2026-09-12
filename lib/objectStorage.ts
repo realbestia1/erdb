@@ -1,5 +1,6 @@
 import { dirname, join, sep } from 'node:path';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync, unlinkSync, readdirSync, rmSync } from 'node:fs';
+import cluster from 'node:cluster';
 import { getCacheTtlMsFromCacheControl } from './imageCacheTtl';
 import { DATA_DIR } from './paths';
 import { FINAL_IMAGE_RENDERER_CACHE_VERSION } from './routeConfig';
@@ -146,6 +147,12 @@ const ensureObjectStoragePrunerStarted = () => {
     return;
   }
 
+  // ponytail: full-tree walk is sync I/O over thousands of files. One worker
+  // is enough; others would just block their event loops doing the same scan.
+  if (cluster.isWorker && cluster.worker?.id !== 1) {
+    return;
+  }
+
   pruneExpiredObjectStorageImages();
   globalState.__erdbImageCachePruneTimer = setInterval(pruneExpiredObjectStorageImages, IMAGE_CACHE_PRUNE_INTERVAL_MS);
 };
@@ -160,6 +167,34 @@ export const buildObjectStorageImageKey = (
   ext = 'png'
 ) => `final/${imageType}/${cacheHash}.${ext}`;
 export const buildObjectStorageSourceImageKey = (id: string, variant: string) => `source/${id.replace(/[^a-zA-Z0-9]/g, '_')}_${variant}.png`;
+
+// ponytail: hard cap on TMDB source files. Oldest (by mtime) evicted first,
+// so disk stays bounded no matter how many distinct titles 5000 users browse.
+export const enforceSourceCacheLimit = (maxFiles: number) => {
+  if (!(maxFiles > 0)) return;
+  try {
+    const dir = join(CACHE_DIR, 'source');
+    if (!existsSync(dir)) return;
+    const entries: Array<{ filePath: string; mtimeMs: number }> = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isFile() || entry.name.endsWith('.json')) continue;
+      const filePath = join(dir, entry.name);
+      try {
+        entries.push({ filePath, mtimeMs: statSync(filePath).mtimeMs });
+      } catch {
+        // Skip files that vanished mid-scan.
+      }
+    }
+    const overflow = entries.length - maxFiles;
+    if (overflow <= 0) return;
+    entries.sort((a, b) => a.mtimeMs - b.mtimeMs);
+    for (const victim of entries.slice(0, overflow)) {
+      deleteCachedObject(victim.filePath, `${victim.filePath}.json`);
+    }
+  } catch {
+    // Ignore eviction failures; expiry prune still bounds growth by TTL.
+  }
+};
 
 export const getCachedImageFromObjectStorage = async (key: string): Promise<ObjectStorageResult | null> => {
   const filePath = getFilePath(key);

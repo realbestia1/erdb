@@ -6,6 +6,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       ERDB_WORKERS: ${ERDB_WORKERS:-auto}
+      ERDB_SHARP_CONCURRENCY: ${ERDB_SHARP_CONCURRENCY:-1}
+      ERDB_SOURCE_CACHE_MAX_FILES: ${ERDB_SOURCE_CACHE_MAX_FILES:-10000}
     ports:
       - '${ERDB_HTTP_PORT:-3000}:3000'
     volumes:

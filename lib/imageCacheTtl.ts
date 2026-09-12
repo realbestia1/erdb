@@ -43,8 +43,12 @@ export const getFinalImageCacheTtlMs = (input: {
   return input.fallbackTtlMs ?? input.tmdbTtlMs;
 };
 
-export const buildPublicImageCacheControl = (ttlMs: number, staleWhileRevalidateSeconds = 60) =>
-  `public, s-maxage=${Math.max(60, Math.floor(ttlMs / 1000))}, stale-while-revalidate=${Math.max(
+export const buildPublicImageCacheControl = (ttlMs: number, staleWhileRevalidateSeconds = 60) => {
+  const ttlSeconds = Math.max(60, Math.floor(ttlMs / 1000));
+  // ponytail: browser max-age capped at 1 day, CDN s-maxage keeps full TTL (key includes config version).
+  const browserSeconds = Math.min(ttlSeconds, 86400);
+  return `public, max-age=${browserSeconds}, s-maxage=${ttlSeconds}, stale-while-revalidate=${Math.max(
     0,
     Math.trunc(staleWhileRevalidateSeconds)
   )}`;
+};

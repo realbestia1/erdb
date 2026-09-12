@@ -9,6 +9,7 @@ import { GENERATED_LOGO_FONT_VARIANTS } from '@/lib/logoFontVariants';
 import { getMetadata, setMetadata } from '@/lib/metadataCache';
 import {
   getCachedImageFromObjectStorage,
+  enforceSourceCacheLimit,
   isObjectStorageConfigured,
   putCachedImageToObjectStorage,
 } from '@/lib/objectStorage';
@@ -79,8 +80,10 @@ const configureSharp = (sharp: any) => {
   if (sharpConfigured || !sharp) return;
   sharpConfigured = true;
 
-  const concurrency = parseNonNegativeInt(process.env.ERDB_SHARP_CONCURRENCY, 0);
-  if (concurrency && concurrency > 0) {
+  // ponytail: default 1 thread. Cluster already spreads workers over cores;
+  // sharp's default (1 thread per core in every worker) oversubscribes CPU.
+  const concurrency = parseNonNegativeInt(process.env.ERDB_SHARP_CONCURRENCY) ?? 1;
+  if (concurrency > 0) {
     sharp.concurrency(concurrency);
   }
 
@@ -220,7 +223,22 @@ const extractSvgWidth = (svg: string) => {
 };
 
 const pickTmdbImageSize = (imageType: RenderImageType, outputWidth: number) => {
-  if (imageType === 'poster' || imageType === 'backdrop' || imageType === 'thumbnail' || imageType === 'logo') {
+  // ponytail: download at ~1:1 instead of 4K originals (same pixels on screen,
+  // far less decode/resize CPU). Only sizes valid for the type (wrong size = 404).
+  if (imageType === 'poster') {
+    if (outputWidth <= 342) return 'w342';
+    if (outputWidth <= 500) return 'w500';
+    if (outputWidth <= 780) return 'w780';
+    return 'original';
+  }
+  if (imageType === 'backdrop') {
+    if (outputWidth <= 780) return 'w780';
+    if (outputWidth <= 1280) return 'w1280';
+    return 'original';
+  }
+  if (imageType === 'logo') {
+    if (outputWidth <= 300) return 'w300';
+    if (outputWidth <= 500) return 'w500';
     return 'original';
   }
   return 'original';
@@ -252,6 +270,26 @@ const fetchSourceImageUncached = async (
   };
 };
 
+// ponytail: 0 disables the source disk cache. Default caps disk at ~10k
+// compressed files (oldest evicted first, TTL prune still applies).
+const SOURCE_CACHE_MAX_FILES =
+  parseNonNegativeInt(process.env.ERDB_SOURCE_CACHE_MAX_FILES) ?? 10000;
+
+const compressSourceForCache = async (
+  buffer: Buffer
+): Promise<{ body: ArrayBuffer; contentType: string } | null> => {
+  try {
+    const sharp = await getSharpFactory();
+    const out = await sharp(buffer)
+      .resize({ width: 1280, withoutEnlargement: true })
+      .webp({ quality: 80, effort: 3 })
+      .toBuffer();
+    return { body: bufferToArrayBuffer(out), contentType: 'image/webp' };
+  } catch {
+    return null;
+  }
+};
+
 export const getSourceImagePayload = async (
   imgUrl: string,
   fallbackTtlMs = TMDB_CACHE_TTL_MS
@@ -262,7 +300,43 @@ export const getSourceImagePayload = async (
   }
 
   return withDedupe(sourceImageInFlight, normalizedImgUrl, async () => {
-    return fetchSourceImageUncached(normalizedImgUrl, fallbackTtlMs);
+    // ponytail: every render re-downloaded multi-MB originals. Disk cache
+    // turns repeats into local file reads. data: URLs are already local, skip.
+    const cacheKey = normalizedImgUrl.startsWith('data:')
+      ? null
+      : `source/${sha1Hex(normalizedImgUrl)}.bin`;
+    if (cacheKey) {
+      try {
+        const cached = await getCachedImageFromObjectStorage(cacheKey);
+        if (cached) {
+          return {
+            body: cached.body,
+            contentType: cached.contentType,
+            cacheControl: cached.cacheControl,
+          };
+        }
+      } catch {
+        // Fall through to network.
+      }
+    }
+    const fresh = await fetchSourceImageUncached(normalizedImgUrl, fallbackTtlMs);
+    if (cacheKey && SOURCE_CACHE_MAX_FILES > 0) {
+      try {
+        // ponytail: store WebP ≤1280px (~80-200KB) not the original (MBs).
+        // Render decodes it identically; one extra lossy gen is invisible
+        // under badges/resize. Falls back to raw bytes if encode fails.
+        const compressed = await compressSourceForCache(Buffer.from(fresh.body));
+        await putCachedImageToObjectStorage(cacheKey, {
+          body: compressed?.body ?? fresh.body,
+          contentType: compressed?.contentType ?? fresh.contentType,
+          cacheControl: fresh.cacheControl,
+        });
+        if (Math.random() < 0.05) enforceSourceCacheLimit(SOURCE_CACHE_MAX_FILES);
+      } catch {
+        // Ignore source cache write failures.
+      }
+    }
+    return fresh;
   });
 };
 
